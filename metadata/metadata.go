@@ -22,6 +22,64 @@ import (
 	"strings"
 )
 
+// HasAnnotation checks if a given annotation exists
+func HasAnnotation(object v1.Object, key string) bool {
+	annotations, err := GetAnnotationsWithPrefix(object, key)
+	if err != nil || len(annotations) == 0 {
+		return false
+	}
+	return true
+}
+
+// HasAnnotationWithValue checks if an annotation exists by searching the key/ value 
+func HasAnnotationWithValue(object v1.Object, key, value string) bool {
+	if annotations, err := GetAnnotationsWithPrefix(object, key); err == nil {
+		for _, val := range annotations {
+			if val == value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// HasLabel checks if a given Label exists
+func HasLabel(object v1.Object, key string) bool {
+	labels, err := GetLabelsWithPrefix(object, key)
+	if err != nil || len(labels) == 0 {
+		return false
+	}
+	return true
+}
+
+// HasLabelWithValue checks if a Label exists by searching the key/ value
+func HasLabelWithValue(object v1.Object, key, value string) bool {
+	if labels, err := GetLabelsWithPrefix(object, key); err == nil {
+		for _, val := range labels {
+			if val == value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// AddAnnotation adds an annotation key/value to an object
+func AddAnnotation(object v1.Object, key string, value string) {
+	annotations := map[string]string{}
+	annotations[key] = value
+
+	AddAnnotations(object, annotations)
+}
+
+// AddLabel adds a Label key/value to an object
+func AddLabel(object v1.Object, key string, value string) {
+	labels := map[string]string{}
+	labels[key] = value
+
+	AddLabels(object, labels)
+}
+
 // AddAnnotations copies the map into the resource's Annotations map.
 // When the destination map is nil, then the map will be created.
 // The unexported function addEntries is called with args passed.
@@ -104,4 +162,42 @@ func safeCopy(destination map[string]string, key, val string) {
 	if _, err := destination[key]; !err {
 		destination[key] = val
 	}
+}
+
+// copyWithNewPrefix copies key/value pairs from a source map to a destination map where the key matches the specified prefix.
+// If replacementPrefix is different from prefix, the prefix will be replaced while performing the copy.
+func copyWithNewPrefix(src, dest map[string]string, prefix, replacementPrefix string) {
+	for key, value := range src {
+		if strings.HasPrefix(key, prefix) {
+			newKey := key
+			if prefix != replacementPrefix {
+				newKey = strings.Replace(key, prefix, replacementPrefix, 1)
+			}
+			dest[newKey] = value
+		}
+	}
+}
+
+// CopyLabelsByPrefix copies all labels from a source object to a destination object where the key matches the specified prefix.
+// If replacementPrefix is different from prefix, the prefix will be replaced while performing the copy.
+func CopyLabelsByPrefix(src, dest v1.Object, prefix, replacementPrefix string) {
+	if src.GetLabels() == nil {
+		return
+	}
+	if dest.GetLabels() == nil {
+		dest.SetLabels(make(map[string]string))
+	}
+	copyWithNewPrefix(src.GetLabels(), dest.GetLabels(), prefix, replacementPrefix)
+}
+
+// CopyAnnotationsByPrefix copies all annotations from a source object to a destination object where the key matches the specified prefix.
+// If replacementPrefix is different from prefix, the prefix will be replaced while performing the copy.
+func CopyAnnotationsByPrefix(src, dest v1.Object, prefix, replacementPrefix string) {
+	if src.GetAnnotations() == nil {
+		return
+	}
+	if dest.GetAnnotations() == nil {
+		dest.SetAnnotations(make(map[string]string))
+	}
+	copyWithNewPrefix(src.GetAnnotations(), dest.GetAnnotations(), prefix, replacementPrefix)
 }

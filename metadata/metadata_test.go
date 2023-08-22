@@ -26,6 +26,18 @@ import (
 
 var _ = Describe("Metadata", func() {
 
+	When("AddAnnotation is called", func() {
+		It("should add the annotation and its value to the object", func() {
+			annotation := "foo"
+			value := "bar"
+			pod := &corev1.Pod{}
+
+			AddAnnotation(pod, annotation, value)
+			Expect(pod.Annotations).To(HaveLen(1))
+			Expect(pod.Annotations[annotation]).To(Equal(value))
+		})
+	})
+
 	When("AddAnnotations is called", func() {
 		It("should add the annotations to the object", func() {
 			annotations := map[string]string{"foo": "bar", "baz": "qux"}
@@ -59,6 +71,17 @@ var _ = Describe("Metadata", func() {
 		})
 	})
 
+	When("AddLabel is called", func() {
+		It("should add the label and its value to the object", func() {
+			label := "foo"
+			value := "bar"
+			pod := &corev1.Pod{}
+
+			AddAnnotation(pod, label, value)
+			Expect(pod.Labels).To(HaveLen(1))
+			Expect(pod.Labels[label]).To(Equal(value))
+		})
+
 	When("AddLabels is called", func() {
 		It("should add the labels to the object", func() {
 			labels := map[string]string{"foo": "bar", "baz": "qux"}
@@ -69,7 +92,7 @@ var _ = Describe("Metadata", func() {
 			Expect(pod.Labels).To(Equal(labels))
 		})
 
-		It("should add the annotations to the existing ones", func() {
+		It("should add the labels to the existing ones", func() {
 			labels := map[string]string{"foo": "bar", "baz": "qux"}
 			pod := &corev1.Pod{
 				ObjectMeta: v1.ObjectMeta{
@@ -89,6 +112,66 @@ var _ = Describe("Metadata", func() {
 			err := AddLabels(nil, map[string]string{})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("object cannot be nil"))
+		})
+	})
+
+	When("HasAnnotationWithValue is called", func() {
+		It("should return true when the annotation/ with the given value is found", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"bar": "foo", "baz": "qux"},
+				},
+			}
+
+			found := HasAnnotation(pod, "bar")
+			Expect(found).To(BeTrue())
+
+			found = HasAnnotationWithValue(pod, "bar", "foo")
+			Expect(found).To(BeTrue())
+		})
+
+		It("should return false when the annotation/ with the given value is not found", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"bar": "foo", "baz": "qux"},
+				},
+			}
+
+			found := HasAnnotation(pod, "nobar")
+			Expect(found).To(BeFalse())
+
+			found = HasAnnotationWithValue(pod, "bar", "nofoo")
+			Expect(found).To(BeFalse())
+		})
+	})
+
+	When("HasLabelWithValue is called", func() {
+		It("should return true when the label/ with the given value is found", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"bar": "foo", "baz": "qux"},
+				},
+			}
+
+			found := HasLabel(pod, "bar")
+			Expect(found).To(BeTrue())
+
+			found = HasLabelWithValue(pod, "bar", "foo")
+			Expect(found).To(BeTrue())
+		})
+
+		It("should return false when the label/ with the given value is not found", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"bar": "foo", "baz": "qux"},
+				},
+			}
+
+			found := HasLabel(pod, "nobar")
+			Expect(found).To(BeFalse())
+
+			found = HasLabelWithValue(pod, "bar", "nofoo")
+			Expect(found).To(BeFalse())
 		})
 	})
 
@@ -125,6 +208,7 @@ var _ = Describe("Metadata", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("object cannot be nil"))
 		})
+
 	})
 
 	When("GetLabelsWithPrefix is called", func() {
@@ -204,6 +288,60 @@ var _ = Describe("Metadata", func() {
 			Expect(destination).To(gstruct.MatchAllKeys(gstruct.Keys{
 				"foo": Equal("bar"),
 				"baz": Equal("qux"),
+			}))
+		})
+	})
+
+	When("copyWithNewPrefix is called", func() {
+		It("should copy key/value pairs with the prefix to destination with new prefix", func() {
+			source := map[string]string{"foo": "bar", "foz": "qux"}
+			destination := map[string]string{"quux": "corge"}
+			copyWithNewPrefix(source, destination, "fo", "ba")
+			Expect(destination).To(HaveLen(3))
+			Expect(destination).To(gstruct.MatchAllKeys(gstruct.Keys{
+				"bao":  Equal("bar"),
+				"baz":  Equal("qux"),
+				"quux": Equal("corge"),
+			}))
+		})
+	})
+
+	When("CopyAnnotationsByPrefix is called", func() {
+		It("should return all the annotations matching the given prefix", func() {
+			podSource := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"foo": "bar", "baz": "qux"},
+				},
+			}
+			podDest := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{"quux": "corge"},
+				},
+			}
+			CopyAnnotationsByPrefix(podSource, podDest, "fo", "ba")
+			Expect(podDest.Annotations).To(gstruct.MatchAllKeys(gstruct.Keys{
+				"bao":  Equal("bar"),
+				"quux": Equal("corge"),
+			}))
+		})
+	})
+
+	When("CopyLabelsByPrefix is called", func() {
+		It("should return all the labels matching the given prefix", func() {
+			podSource := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar", "baz": "qux"},
+				},
+			}
+			podDest := &corev1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"quux": "corge"},
+				},
+			}
+			CopyLabelsByPrefix(podSource, podDest, "fo", "ba")
+			Expect(podDest.Labels).To(gstruct.MatchAllKeys(gstruct.Keys{
+				"bao":  Equal("bar"),
+				"quux": Equal("corge"),
 			}))
 		})
 	})
